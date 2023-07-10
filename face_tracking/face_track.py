@@ -5,8 +5,9 @@ import numpy as np
 
 class TentativeTrack(object):
 
-    def __init__(self, bbox, tentative_id, tentative_steps_before_accepted, max_traject_steps):
+    def __init__(self, bbox, landmark, tentative_id, tentative_steps_before_accepted, max_traject_steps):
         self.bbox = bbox
+        self.landmark = landmark
         self.tentative_id = tentative_id
         self.tentative_steps = 0
         self.tentative_steps_before_accepted = tentative_steps_before_accepted
@@ -17,8 +18,9 @@ class TentativeTrack(object):
 
 class FaceTrack(object):
 
-    def __init__(self, bbox, track_id, inactive_steps_before_removed, traject_pos, traject_vel, time_stamp):
+    def __init__(self, bbox, landmark, track_id, inactive_steps_before_removed, traject_pos, traject_vel, time_stamp):
         self.bbox = bbox  # x_min, y_min, x_max, y_max
+        self.landmark = landmark
         self.track_id = track_id
         self.inactive_steps = 0
         self.inactive_steps_before_removed = inactive_steps_before_removed

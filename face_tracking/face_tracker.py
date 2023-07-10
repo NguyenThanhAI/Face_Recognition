@@ -63,6 +63,7 @@ class FaceTracker:
         num_new = len(tracks)
         for i in range(num_new):
             self.active_tracks.append(FaceTrack(bbox=tracks[i].bbox,
+                                                landmark=tracks[i].landmark,
                                                 track_id=self.track_num + i,
                                                 inactive_steps_before_removed=self.inactive_steps_before_removed,
                                                 traject_pos=tracks[i].traject_pos,
@@ -77,6 +78,7 @@ class FaceTracker:
 
         for i in range(num_new):
             self.tentative_tracks.append(TentativeTrack(bbox=face_detections_list[i].bbox,
+                                                        landmark=face_detections_list[i].landmark,
                                                         tentative_id=self.tentative_track_num + 1,
                                                         tentative_steps_before_accepted=self.tentative_steps_before_accepted,
                                                         max_traject_steps=self.max_traject_steps))
@@ -127,6 +129,7 @@ class FaceTracker:
                 matched_detection_indx.append(c)
                 t = self.tentative_tracks[r]
                 t.bbox = face_detections[c].bbox
+                t.landmark = face_detections[c].landmark
                 t.time_stamp.append(time.time())
         unmatched_tracks = [self.tentative_tracks[i] for i in range(len(self.tentative_tracks)) if i not in matched_track_indx]
         unmatched_detections = [face_detections[j] for j in range(len(face_detections)) if j not in matched_detection_indx]
@@ -156,6 +159,7 @@ class FaceTracker:
                 matched_detection_indx.append(c)
                 t = self.active_tracks[r]
                 t.bbox = face_detections[c].bbox
+                t.landmark = face_detections[c].landmark
                 t.time_stamp.append(time.time())
                 self.det_id_to_track_id_match_dict[face_detections[c].detection_id] = t.track_id
         unmatched_tracks = [self.active_tracks[i] for i in range(len(self.active_tracks)) if i not in matched_track_indx]
@@ -187,6 +191,7 @@ class FaceTracker:
                 matched_detection_idx.append(c)
                 t = self.inactive_tracks[r]
                 t.bbox = face_detections[c].bbox
+                t.landmark = face_detections[c].landmark
                 t.reset_trajectory()
                 t.inactive_steps = 0
                 t.birth_time.append(time.time())
