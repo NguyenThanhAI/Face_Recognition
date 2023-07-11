@@ -33,6 +33,6 @@ if __name__ == "__main__":
     feat = feat / np.sqrt(np.sum(feat**2, axis=-1, keepdims=True))
     print(feat)
     
-    dist =  np.sum(feat[:, None, :] * feat[None, :, :], axis=-1)
+    dist =  np.sum((feat[:, None, :] - feat[None, :, :])**2, axis=-1)
     print(dist)
     
