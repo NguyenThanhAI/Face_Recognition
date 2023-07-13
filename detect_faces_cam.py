@@ -15,6 +15,7 @@ from videostream.videostream import QueuedStream
 from face_tracking.face_detection import FaceDetection
 from face_tracking.face_tracker import FaceTracker
 
+from align.face_align import *
 from utils import face_orientation, compute_head_pose, alignment_procedure
 
 
@@ -109,6 +110,7 @@ if __name__ == "__main__":
                     #         cv2.putText(frame, str(j), (int(point[0]) + 3, int(point[1]) - 3),  cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 0), 1)            
             tracker.step(face_detections=detections_list)
             face_tracks = tracker.get_result()
+            frame_copy = frame.copy()
             for face_track in face_tracks:
                 bbox = face_track.bbox
                 landmark = face_track.landmark
@@ -119,7 +121,38 @@ if __name__ == "__main__":
                 x_max = int(x_max)
                 y_min = int(y_min)
                 y_max = int(y_max)
+                c_x = int((x_min + x_max)/2)
+                c_y = int((y_min + y_max)/2)
+                if h > w:
+                    h_max = True
+                else:
+                    h_max = False
+                w = x_max - x_min
+                h = y_max - y_min
+                
                 print(x_min, y_min, x_max, y_max, track_id)
+                #ext = 0
+                #face_img = frame_copy[max(y_min - int(ext*(y_max - y_min)), 0):min(y_max + int(ext*(y_max - y_min)), frame.shape[0]), max(x_min - int(ext * (x_max - x_min)), 0):min(x_max + int(ext * (x_max - x_min)), frame.shape[1])]
+                if h_max:
+                    x_min = max(c_x - int(0.5 * h), 0)
+                    x_max = min(c_x + int(0.5 * h), frame.shape[1])
+                else:
+                    y_min = max(c_y - int(0.5 * w), 0)
+                    y_max = min(c_y + int(0.5 * w), frame.shape[0])
+                face_img = frame_copy[y_min:y_max, x_min:x_max]
+                left_eye_indices = list(range(36, 42))
+                right_eye_indices = list(range(42, 48))
+                left_eye = np.mean(landmark[left_eye_indices], axis=0).astype(np.int16).astype(np.float32)
+                right_eye = np.mean(landmark[right_eye_indices], axis=0).astype(np.int16).astype(np.float32)
+                nose = landmark[30]
+                left_mouth = landmark[48]
+                right_mouth = landmark[54]
+                lmk = np.array([left_eye, right_eye, nose, left_mouth, right_mouth], dtype=np.float32)
+                #lmk = lmk - np.array([max(x_min - int(ext * (x_max - x_min)), 0), max(y_min - int(ext*(y_max - y_min)), 0)], dtype=np.float32)
+                lmk = lmk - np.array([x_min, y_min], dtype=np.float32)
+                face_img = norm_crop(face_img, lmk)
+                face_id += 1
+                cv2.imwrite(os.path.join(save_dir, "face_{}.jpg".format(face_id)), face_img)
                 result = "Track id: {}".format(track_id)
                 cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (255, 255, 0), 1)
                 cv2.putText(frame, result, (x_min + int(0.05*(x_max - x_min)), y_min - int(0.05*(y_max - y_min))), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 0), 1)
