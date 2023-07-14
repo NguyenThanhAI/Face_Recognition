@@ -12,13 +12,15 @@ import sys
 import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from threads import DefaultProcess
+from threads import DefaultProcess, RegisterProcess
 
 class Ui_MainWindow(QtWidgets.QMainWindow):
     def __init__(self, network, weights) -> None:
         super(Ui_MainWindow, self).__init__()
         self.default_process = DefaultProcess(network=network, weights=weights)
+        self.register_process = RegisterProcess(network=network, weights=weights)
         self.default_process.update_frame.connect(self.update_frame)
+        self.register_process.update_frame.connect(self.update_register_frame)
         self.default_process.start()
         
     
@@ -33,6 +35,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.pushButton = QtWidgets.QPushButton(self.centralwidget)
         self.pushButton.setGeometry(QtCore.QRect(670, 40, 91, 23))
         self.pushButton.setObjectName("pushButton")
+        self.pushButton.clicked.connect(self.run_register)
         self.textEdit = QtWidgets.QTextEdit(self.centralwidget)
         self.textEdit.setGeometry(QtCore.QRect(660, 80, 104, 71))
         self.textEdit.setObjectName("textEdit")
@@ -64,6 +67,13 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self._set_video_frame()
         self.update()
         
+    @QtCore.pyqtSlot(np.ndarray)
+    def update_register_frame(self, frame):
+        self.frame = frame
+        self._set_video_frame()
+        # if satisfy_angle:
+        #     assert vector is not None
+        
     
     def _set_video_frame(self):
         img_h, img_w = self.frame.shape[:2]
@@ -71,6 +81,12 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         qimg = QtGui.QImage(out, img_w, img_h, img_w * 3,
                             QtGui.QImage.Format_RGB888).rgbSwapped()
         self.label.setPixmap(QtGui.QPixmap(qimg))
+        
+    def run_register(self):
+        self.default_process.stop()
+        self.register_process.start()
+        
+        
 
 
 if __name__ == "__main__":
