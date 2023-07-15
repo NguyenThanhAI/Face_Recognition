@@ -23,6 +23,7 @@ checkpoint
 *.json
 *.gif
 *.ipynb
+*.txt
 
 20news-bydate/
 workspace/
