@@ -22,28 +22,29 @@ model.load_state_dict(torch.load(weights, map_location=torch.device("cpu")))
 model.eval()
 model.to(device)
 
-def extract_feature(files) -> np.ndarray:
-    imgs = []
-    for file in files:
-        face = cv2.imread(file)[:, :, ::-1]
-        if face is None:
-            return face
 
-        img = np.array(face)
-        #img = np.transpose(img, (2, 0, 1))
-        img = preprocess(img=img)
-        imgs.append(img)
+def extract_feature(file) -> np.ndarray:
+
+    if not isinstance(file, np.ndarray):
+        face = cv2.imread(file)[:, :, ::-1]
+    else:
+        face = file
+    if face is None:
+        return face
+    img = np.array(face)
+    #img = np.transpose(img, (2, 0, 1))
+    img = preprocess(img=img)
         
-    imgs = np.stack(imgs, axis=0)
-    imgs = torch.from_numpy(imgs).float()
+    img = torch.from_numpy(img).unsqueeze(0).float()
     #print(img.shape)
-    imgs.div_(255).sub_(0.5).div_(0.5)
+    img.div_(255).sub_(0.5).div_(0.5)
         
-    imgs = imgs.to(device=device)
+    img = img.to(device=device)
     with torch.no_grad():
-        features = model(imgs).cpu().numpy()
+        features = model(img).cpu().numpy()
 
     features = features / np.linalg.norm(features, axis=1)[:, np.newaxis]
+    print(features.shape)
     features = np.mean(features, axis=0)
 
     return features
@@ -56,7 +57,6 @@ def get_args():
     args = parser.parse_args()
     
     return args
-
 
 if __name__ == "__main__":
     args = get_args()
@@ -75,25 +75,14 @@ if __name__ == "__main__":
     print(client.list_collections())
     collection_name = client.list_collections()[0]
     
-    images_list: List[str] = enumerate_images(data_dir=data_dir)
+    #image_path = r"F:\Faces\VN-celeb-aligned\1\0.png"
+    image_path = r"./image/face_10.jpg"
     
-    group_to_images: Dict[str, List[str]] = {}
+    feature = extract_feature(image_path)
+    print(feature)
     
-    for key, items in groupby(images_list, key=lambda x: x.split(os.sep)[-2]):
-        group_to_images[key] = list(items)
-        
-    entities = []
-        
-    for person in tqdm(group_to_images):
-
-        images = group_to_images[person]
-        
-        features = extract_feature(files=images)
-        print(person, features.shape)
-        entities.append({"name": person,
-                         "vector": features.tolist()})
-    res = client.insert(collection_name=collection_name,
-                        data=entities,
-                        progress_bar=True)
+    res = client.search(collection_name=collection_name,
+                        data=[feature.tolist()],
+                        output_fields=["name"])
     
     print(res)
