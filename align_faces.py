@@ -11,7 +11,7 @@ import torch
 
 import face_alignment
 
-
+from align.face_align import *
 from utils import enumerate_images, alignment_procedure, align_face
 
 def get_args():
@@ -62,8 +62,12 @@ if __name__ == "__main__":
                 left_eye = np.mean(landmark[left_eye_indices], axis=0).astype(np.int16).astype(np.float32)
                 right_eye = np.mean(landmark[right_eye_indices], axis=0).astype(np.int16).astype(np.float32)
                 nose = landmark[30]
-                face_img = alignment_procedure(img=face_img, left_eye=left_eye, right_eye=right_eye, nose=nose)
+                left_mouth = landmark[48]
+                right_mouth = landmark[54]
+                lmk = np.array([left_eye, right_eye, nose, left_mouth, right_mouth], dtype=np.float32)
+                #face_img = alignment_procedure(img=face_img, left_eye=left_eye, right_eye=right_eye, nose=nose)
                 #face_img = align_face(image, face_landmarks=landmark, output_size=112, enable_padding=False)
+                face_img = norm_crop(face_img, lmk)
                 save_path = os.path.join(person_dir, os.path.basename(image))
                 cv2.imwrite(save_path, face_img)
             except Exception as e:
