@@ -21,6 +21,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.client = MilvusConnection()
         self.collection_name = self.client.list_collections()[0]
         self.regis_name = None
+        self.default_mode = True
         self.default_process = DefaultProcess(network=network, weights=weights)
         self.register_process = RegisterProcess(network=network, weights=weights)
         self.default_process.update_frame.connect(self.update_frame)
@@ -78,7 +79,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
     def update_register_frame(self, frame):
         self.frame = frame
         self._set_video_frame()
-
+        self.update()
         
         # self.register_process.stop()
         # self.default_process.set_start()
@@ -94,9 +95,16 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.label.setPixmap(QtGui.QPixmap(qimg))
         
     def run_register(self):
-        self.default_process.stop()
-        self.register_process.set_start()
-        self.register_process.start()
+        if self.default_mode:
+            self.default_mode = False
+            self.default_process.stop()
+            self.register_process.set_start()
+            self.register_process.start()
+        else:
+            self.default_mode = True
+            self.register_process.stop()
+            self.default_process.set_start()
+            self.default_process.start()  
         
     def confirm_name(self):
         if self.textEdit.isEnabled():
@@ -116,6 +124,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
             if self.textEdit.isEnabled():
                 self.textEdit.setEnabled(False)
             
+            self.default_mode = True
             self.register_process.stop()
             self.default_process.set_start()
             self.default_process.start()  
