@@ -1,4 +1,5 @@
 import os
+from typing import List
 import numpy as np
 import cv2
 import torch
@@ -153,7 +154,7 @@ class DefaultProcess(QtCore.QThread):
                         if dist > self.threshold:
                             person = "Unknown"
                         else:
-                            person = res[0]["entities"]["name"]
+                            person = res[0]["entity"]["name"]
                             
                         cv2.putText(frame, person, (x_min + int(0.05*(x_max - x_min)), y_min - int(0.05*(y_max - y_min))), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 0), 1)
                 except Exception as e:
@@ -181,12 +182,13 @@ class RegisterProcess(QtCore.QThread):
     
     #update_frame = QtCore.pyqtSignal(np.ndarray, np.ndarray, bool)
     update_frame = QtCore.pyqtSignal(np.ndarray)
-        
+    update_vector = QtCore.pyqtSignal(np.ndarray)
         
     def __init__(self, network, weights) -> None:
         super(RegisterProcess, self).__init__()
         self.network = network
         self.weights = weights
+        self.threshold = 0.8
         self.stopped = False
         
     def run(self):
@@ -197,6 +199,8 @@ class RegisterProcess(QtCore.QThread):
                               reid_iou_threshold=0.6,
                               max_traject_steps=30,
                               tentative_steps_before_accepted=3)
+        client = MilvusConnection()
+        collection_name = client.list_collections()[0]
         stream.start()
         
         if not stream.isOpened():
@@ -267,14 +271,10 @@ class RegisterProcess(QtCore.QThread):
                         
                         cv2.putText(frame, "Move to center of camera", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
                         #self.update_frame.emit(frame, vector, satisfy)
+                        #vector = np.random.rand(3)
                         self.update_frame.emit(frame)
                         continue
                     
-                    angle = compute_eyes_angle(landmark=landmark)
-                    
-                    if abs(angle) > 15:
-                        cv2.putText(frame, "Balance your face", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
-                    print("Angle: {}".format(angle))
                     
                     cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (255, 255, 0), 1)
                     
@@ -288,9 +288,16 @@ class RegisterProcess(QtCore.QThread):
                             # 54: Miệng phải
                             cv2.circle(frame, (int(point[0]), int(point[1])), 2, (0, 0, 255), -1)
                             cv2.putText(frame, str(j), (int(point[0]) + 3, int(point[1]) - 3),  cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 0), 1)
-                            
-                    #self.update_frame.emit(frame, vector, satisfy)
-                    self.update_frame.emit(frame)
+                    
+                    angle = compute_eyes_angle(landmark=landmark)
+                    
+                    if abs(angle) > 15:
+                        cv2.putText(frame, "Balance your face", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
+                        #vector = np.random.rand(3)
+                        self.update_frame.emit(frame)
+                        continue
+                    print("Angle: {}".format(angle))
+                    #self.update_frame.emit(frame)
                     
                     face_img = frame_copy[y_min:y_max, x_min:x_max]
                     left_eye_indices = list(range(36, 42))
@@ -312,13 +319,49 @@ class RegisterProcess(QtCore.QThread):
                         features = face_recog_model(img).cpu().numpy()
                         
                     features = features / np.linalg.norm(features, axis=1)
-                        
-                    print("Feature shape: {}".format(features[0].shape))
+                    features = features.tolist()
+                    print(len(features), len(features[0]))
                       
+                    query_res = client.search(collection_name=collection_name,
+                                              data=features,
+                                              limit=3,
+                                              output_fields=["name"])
                     
-                
+                    # dist = query_res[0][0]["distance"]
+                    
+                    # if dist < self.threshold:
+                    #     print(query_res)
+                    #     already_name = query_res[0][0]["entity"]["name"]
+                    #     cv2.putText(frame, "Are you registered as {}".format(already_name), (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
+                    #     #vector = np.random.rand(3)
+                    #     self.update_frame.emit(frame)
+                    #     continue
+                    
+                    print("Query result: {}".format(query_res))
+                    already_name = None
+                    for i, res in enumerate(query_res):
+                        dist = res[0]["distance"]
+                        if dist < self.threshold:
+                            already_name = res[0]["entity"]["name"]
+                            #already_name = "1"
+                            cv2.putText(frame, "Are you registered as {}?".format(already_name), (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
+                        break
+                    
+                    if already_name is not None:
+                        self.update_frame.emit(frame)
+                        continue
+                    
+                    if vector is None:
+                        vector = features[0]
+                    satisfy = True
+                    cv2.putText(frame, "Type your name and confirm", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 0), 1)
+                    self.update_frame.emit(frame)
+                    
+                    if vector is not None and satisfy:
+                        self.update_vector.emit(vector)
             except Exception as e:
                 print("Exception: {}".format(e))
+                self.update_frame.emit(frame)
                 continue
             
             #cv2.putText(frame, "Register Mode", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
