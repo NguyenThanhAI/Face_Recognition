@@ -71,5 +71,8 @@ class MilvusConnection(object):
     
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = MilvusClient()
+            with open("./authen.txt", "r") as f:
+                lines = f.read()
+            api_endpoint, token = lines.split("\n")
+            cls._instance = MilvusClient(uri=api_endpoint, token=token)
         return cls._instance

@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import torch
 from PyQt5 import QtCore, QtWidgets
-from singletons import Detector, RecognitionModel
+from singletons import Detector, RecognitionModel, MilvusConnection
 from face_tracking.face_tracker import FaceTracker
 from face_tracking.face_detection import FaceDetection
 from videostream.videostream import QueuedStream
@@ -20,6 +20,7 @@ class DefaultProcess(QtCore.QThread):
         super(DefaultProcess, self).__init__()
         self.network = network
         self.weights = weights
+        self.threshold = 0.6
         self.stopped = False
         
     def run(self):
@@ -30,6 +31,8 @@ class DefaultProcess(QtCore.QThread):
                               reid_iou_threshold=0.6,
                               max_traject_steps=30,
                               tentative_steps_before_accepted=3)
+        client = MilvusConnection()
+        collection_name = client.list_collections()[0]
         stream.start()
         
         if not stream.isOpened():
@@ -63,6 +66,7 @@ class DefaultProcess(QtCore.QThread):
                 face_tracks = tracker.get_result()
                 
                 order_to_track_id = {}
+                track_id_to_bbox = {}
                 images_list = []
                 frame_copy = frame.copy()
                 for i, face_track in enumerate(face_tracks):
@@ -110,8 +114,9 @@ class DefaultProcess(QtCore.QThread):
                     #face_img = np.transpose(face_img, (2, 0, 1))
                     images_list.append(preprocess(face_img))
                     
+                    track_id_to_bbox[track_id] = (x_min, y_min, x_max, y_max)
                     cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (255, 255, 0), 1)
-                    cv2.putText(frame, result, (x_min + int(0.05*(x_max - x_min)), y_min - int(0.05*(y_max - y_min))), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 0), 1)
+                    #cv2.putText(frame, result, (x_min + int(0.05*(x_max - x_min)), y_min - int(0.05*(y_max - y_min))), cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 0), 1)
                     
                     for j, point in enumerate(landmark):
                         if j in [8, 30, 36, 45, 48, 54]:
@@ -124,19 +129,37 @@ class DefaultProcess(QtCore.QThread):
                             cv2.circle(frame, (int(point[0]), int(point[1])), 2, (0, 0, 255), -1)
                             cv2.putText(frame, str(j), (int(point[0]) + 3, int(point[1]) - 3),  cv2.FONT_HERSHEY_COMPLEX, 0.3, (255, 255, 0), 1)
                 
+                try:
+                    images = np.stack(images_list, axis=0)
+                    images = torch.from_numpy(images).float()
+                    images.div_(255).sub_(0.5).div_(0.5)
+                    images = images.to(device)
+
+                    with torch.no_grad():
+                        features = face_recog_model(images).cpu().numpy()
+
+                    features = features / np.linalg.norm(features, axis=1)
+
+                    features = features.tolist()
+                    print(len(features), len(features[0]))
+                    
+                    query_res = client.search(collection_name=collection_name,
+                                              data=features,
+                                              limit=3,
+                                              output_fields=["name"])
+                    print("Query result: {}".format(query_res))
+                    for i, res in enumerate(query_res):
+                        dist = res[0]["distance"]
+                        if dist > self.threshold:
+                            person = "Unknown"
+                        else:
+                            person = res[0]["entities"]["name"]
+                            
+                        cv2.putText(frame, person, (x_min + int(0.05*(x_max - x_min)), y_min - int(0.05*(y_max - y_min))), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 0), 1)
+                except Exception as e:
+                    print("Extract feature error: {}".format(e))
+                
                 self.update_frame.emit(frame)
-                images = np.stack(images_list, axis=0)
-                images = torch.from_numpy(images).float()
-                images.div_(255).sub_(0.5).div_(0.5)
-                images = images.to(device)
-                
-                with torch.no_grad():
-                    features = face_recog_model(images).cpu().numpy()
-                
-                features = features / np.linalg.norm(features, axis=1)
-                
-                features = list(features)
-                print(len(features), features[0].shape)
                 
             except Exception as e:
                 print("Exception: {}".format(e))
