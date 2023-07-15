@@ -55,8 +55,8 @@ def face_orientation(frame: np.ndarray, landmark):
     image_points = np.array([
                             (landmark[30][0], landmark[30][1]),     # Nose tip
                             (landmark[8][0], landmark[8][1]),       # Chin
-                            (landmark[45][0], landmark[45][1]),     # Left eye left corner
-                            (landmark[36][0], landmark[36][1]),     # Right eye right corne
+                            (landmark[36][0], landmark[36][1]),     # Left eye left corner
+                            (landmark[45][0], landmark[45][1]),     # Right eye right corne
                             (landmark[48][0], landmark[48][1]),     # Left Mouth corner
                             (landmark[54][0], landmark[54][1])      # Right mouth corner
                         ], dtype="double")
@@ -197,6 +197,55 @@ def alignment_procedure(img, left_eye, right_eye, nose):
     #-----------------------
 
     return img #return img anyway
+
+
+def compute_eyes_angle(landmark):
+    left_eye_indices = list(range(36, 42))
+    right_eye_indices = list(range(42, 48))
+    left_eye = np.mean(landmark[left_eye_indices], axis=0).astype(np.int16).astype(np.float32)
+    right_eye = np.mean(landmark[right_eye_indices], axis=0).astype(np.int16).astype(np.float32)
+    
+    left_eye_x, left_eye_y = left_eye
+    right_eye_x, right_eye_y = right_eye
+
+    #-----------------------
+    #decide the image is inverse
+
+    center_eyes = (int((left_eye_x + right_eye_x) / 2), int((left_eye_y + right_eye_y) / 2))
+    
+    if left_eye_y > right_eye_y:
+        point_3rd = (right_eye_x, left_eye_y)
+        direction = -1 #rotate same direction to clock
+    else:
+        point_3rd = (left_eye_x, right_eye_y)
+        direction = 1 #rotate inverse direction of clock
+        
+    a = findEuclideanDistance(np.array(left_eye), np.array(point_3rd))
+    b = findEuclideanDistance(np.array(right_eye), np.array(point_3rd))
+    c = findEuclideanDistance(np.array(right_eye), np.array(left_eye))
+    
+    if b != 0 and c != 0: #this multiplication causes division by zero in cos_a calculation
+
+        cos_a = (b*b + c*c - a*a)/(2*b*c)
+        
+        #PR15: While mathematically cos_a must be within the closed range [-1.0, 1.0], floating point errors would produce cases violating this
+        #In fact, we did come across a case where cos_a took the value 1.0000000169176173, which lead to a NaN from the following np.arccos step
+        cos_a = min(1.0, max(-1.0, cos_a))
+        
+        
+        angle = np.arccos(cos_a) #angle in radian
+        angle = (angle * 180) / math.pi #radian to degree
+
+        #-----------------------
+        #rotate base image
+
+        if direction == -1:
+            angle = 90 - angle
+    else:
+        angle = 0
+        
+    return angle
+    
 
 
 def align_face(src_file, face_landmarks, output_size=1024, transform_size=4096, enable_padding=True):
