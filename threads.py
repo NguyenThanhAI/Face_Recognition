@@ -319,11 +319,11 @@ class RegisterProcess(QtCore.QThread):
                         features = face_recog_model(img).cpu().numpy()
                         
                     features = features / np.linalg.norm(features, axis=1)
-                    features = features.tolist()
+                    features_list = features.tolist()
                     print(len(features), len(features[0]))
                       
                     query_res = client.search(collection_name=collection_name,
-                                              data=features,
+                                              data=features_list,
                                               limit=3,
                                               output_fields=["name"])
                     
@@ -344,7 +344,7 @@ class RegisterProcess(QtCore.QThread):
                         if dist < self.threshold:
                             already_name = res[0]["entity"]["name"]
                             #already_name = "1"
-                            cv2.putText(frame, "Are you registered as {}?".format(already_name), (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 0), 2)
+                            cv2.putText(frame, "Are you registered as {}?".format(already_name), (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 0, 255), 1)
                         break
                     
                     if already_name is not None:
@@ -354,7 +354,7 @@ class RegisterProcess(QtCore.QThread):
                     if vector is None:
                         vector = features[0]
                     satisfy = True
-                    cv2.putText(frame, "Type your name and confirm", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 0.8, (255, 255, 0), 1)
+                    cv2.putText(frame, "Type your name and confirm", (int(0.1 * frame.shape[0]), int(0.1 * frame.shape[1])), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 1)
                     self.update_frame.emit(frame)
                     
                     if vector is not None and satisfy:
