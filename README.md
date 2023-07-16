@@ -1,0 +1,3 @@
+- Download Arcface checkpoint from: https://drive.google.com/drive/folders/1qLX36vFljODOjGHlWI6FzNlEeE2sxfoe?usp=drive_link
+- Copy ```authen.txt``` from folder to code folder
+- Run file ```python main_ui.py --weights path/to/arcface/pretrained/path``` 
