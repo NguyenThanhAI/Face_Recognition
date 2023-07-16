@@ -9,6 +9,7 @@
 
 import sys
 from typing import List
+import argparse
 import numpy as np
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -97,11 +98,13 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
     def run_register(self):
         if self.default_mode:
             self.default_mode = False
+            self.pushButton.setText("Default Mode")
             self.default_process.stop()
             self.register_process.set_start()
             self.register_process.start()
         else:
             self.default_mode = True
+            self.pushButton.setText("Register Mode")
             self.register_process.stop()
             self.default_process.set_start()
             self.default_process.start()  
@@ -123,20 +126,29 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
             self.regis_name = None
             if self.textEdit.isEnabled():
                 self.textEdit.setEnabled(False)
-            
+            self.textEdit.clear()
             self.default_mode = True
+            self.pushButton.setText("Register Mode")
             self.register_process.stop()
             self.default_process.set_start()
             self.default_process.start()  
             
         
         
+def get_args():
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("--weights", type=str, default=r"F:\Face_Models\Arcface\backbone.pth")
+    
+    args = parser.parse_args()
+    
+    return args
 
 
 if __name__ == "__main__":
-    
+    args = get_args()
     network = "r50"
-    weights = r"F:\Face_Models\Arcface\backbone.pth"
+    weights = args.weights
     app = QtWidgets.QApplication(sys.argv)
     ui = Ui_MainWindow(network=network, weights=weights)
     ui.setupUi()
